@@ -1,21 +1,24 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { Duration, Stack, StackProps } from 'aws-cdk-lib'
-import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { Duration, Stack, StackProps } from 'aws-cdk-lib';
 import { WebSocketApi, WebSocketStage } from 'aws-cdk-lib/aws-apigatewayv2';
 import { WebSocketLambdaAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { WebSocketLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
-import { Runtime, Tracing } from 'aws-cdk-lib/aws-lambda';
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
-import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { AnyPrincipal, Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
-import { Construct } from 'constructs';
-import { join } from 'path';
-import { NagSuppressions } from 'cdk-nag';
-import * as path from 'path';
+import { Runtime, Tracing } from 'aws-cdk-lib/aws-lambda';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { NagSuppressions } from 'cdk-nag';
+import { Construct } from 'constructs';
+import * as path from 'path';
+import { join } from 'path';
 
+// WebsocketPropsインターフェースは、スタックに渡すプロパティを定義します。
+// messagesTable: メッセージを保存するDynamoDBテーブル。
+// connectionsTable: 接続情報を保存するDynamoDBテーブル。
 export interface WebsocketProps extends StackProps {
   messagesTable: Table;
   channelsTable: Table;
@@ -51,6 +54,7 @@ export class WebsocketStack extends Stack {
           "Bool": {"aws:SecureTransport": "false"},
       },
     }));
+    // Suppress Nag warning for missing DLQ
     NagSuppressions.addResourceSuppressions(
       statusQueue,
       [
@@ -86,7 +90,9 @@ export class WebsocketStack extends Stack {
           '@aws-lambda-powertools/metrics'
         ],
       },
+      // Lambda関数の依存関係をロックするためのファイルを指定します
       depsLockFilePath: join(__dirname, '../resources/', 'package-lock.json'),
+      // Lambda関数の環境変数を設定します
       environment: {
         CONNECTIONS_TABLE_NAME: props?.connectionsTable.tableName!,
         MESSAGES_TABLE_NAME: props?.messagesTable.tableName!,
@@ -95,18 +101,22 @@ export class WebsocketStack extends Stack {
         COGNITO_USER_POOL_ID: props?.cognitoUserPoolId!,
         LOG_LEVEL: props?.logLevel!
       },
+      // Lambda関数のエントリポイントとなるファイルを指定します
       handler: "handler",
       runtime: Runtime.NODEJS_20_X,
       tracing: Tracing.ACTIVE
     }
 
     const authorizerHandler = new NodejsFunction(this, "AuthorizerHandler", {
+      // authorizer.ts: WebSocket接続時の認証処理を定義します
       entry: path.join(__dirname, `/../resources/handlers/websocket/authorizer.ts`),
       ...nodeJsFunctionProps
     });
     authorizerHandler.addToRolePolicy(ssmPolicyStatement);
 
+    // 接続時、切断時、メッセージ送信時のイベントを処理します
     const onConnectHandler = new NodejsFunction(this, "OnConnectHandler", {
+      // onconnect.ts: クライアント接続時の処理を定義します
       entry: path.join(__dirname, `/../resources/handlers/websocket/onconnect.ts`),
       ...nodeJsFunctionProps
     });
@@ -114,6 +124,7 @@ export class WebsocketStack extends Stack {
     statusQueue.grantSendMessages(onConnectHandler);
 
     const onDisconnectHandler = new NodejsFunction(this, "OnDisconnectHandler", {
+      // ondisconnect.ts: クライアント切断時の処理を定義します
       entry: path.join(__dirname, `/../resources/handlers/websocket/ondisconnect.ts`),
       ...nodeJsFunctionProps
     });
@@ -121,6 +132,7 @@ export class WebsocketStack extends Stack {
     statusQueue.grantSendMessages(onDisconnectHandler);
 
     const onMessageHandler = new NodejsFunction(this, "OnMessageHandler", {
+      // onmessage.ts: メッセージ送信時の処理を定義します
       entry: path.join(__dirname, `/../resources/handlers/websocket/onmessage.ts`),
       ...nodeJsFunctionProps
     });
@@ -132,8 +144,11 @@ export class WebsocketStack extends Stack {
     const authorizer = new WebSocketLambdaAuthorizer('Authorizer', authorizerHandler, { identitySource: ['route.request.header.Cookie'] });
     this.webSocketApi = new WebSocketApi(this, 'ServerlessChatWebsocketApi', {
       apiName: 'Serverless Chat Websocket API',
+      // クライアントがWebSocketに接続するときのハンドラ
       connectRouteOptions: { integration: new WebSocketLambdaIntegration("ConnectIntegration", onConnectHandler), authorizer },
+      // クライアントがWebSocketから切断されるときのハンドラ
       disconnectRouteOptions: { integration: new WebSocketLambdaIntegration("DisconnectIntegration", onDisconnectHandler) },
+      // メッセージの送信時にデフォルトで使用されるハンドラ
       defaultRouteOptions: { integration: new WebSocketLambdaIntegration("DefaultIntegration", onMessageHandler) },
     });
 
