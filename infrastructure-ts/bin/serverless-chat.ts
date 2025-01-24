@@ -30,19 +30,31 @@ import { WebsocketStack } from '../lib/websocket-stack';
 ### **プロジェクト全体の流れ**
 以下のような流れが予想されます：
 1. **ユーザーがフロントエンドにアクセス**  
-   - S3とCloudFrontでホストされるフロントエンドにユーザーがアクセスします。
+   - S3とCloudFrontでホストされるフロントエンドにユーザーがアクセスします
 
 2. **認証（`auth-stack.ts`）**  
-   - Cognitoを通じて認証し、トークンを取得します。
+   - Cognitoを通じて認証し、トークンを取得します
 
 3. **APIリクエスト（`rest-api-stack.ts`や`websocket-stack.ts`）**  
-   - トークンを使用して、REST APIやWebSocket APIにリクエストを送信します。
+   - トークンを使用して、REST APIやWebSocket APIにリクエストを送信します
 
 4. **イベント処理（`resources/handlers/`）**  
-   - WebSocketイベントが発生し、DynamoDBへの記録や通知が行われます。
+   - WebSocketイベントが発生し、DynamoDBへの記録や通知が行われます
+     - クライアント接続（Connect） → onconnect.ts
+     - クライアント切断（Disconnect） → ondisconnect.ts
+     - メッセージ送信 → onmessage.ts
+   - REST APIのリクエストが発生し、DynamoDBへの記録や通知が行われます
+     - メッセージ取得 → getmessages.ts
+     - チャンネル作成 → createchannel.ts
+     - チャンネル削除 → deletechannel.ts
+     - メッセージ送信 → sendmessage.ts
+   - SQS を介して状態変更（オンライン/オフライン）の通知を送信します
+   - 通知ブロードキャストを行うために、SQS キューを使用します
+     - ユーザーのオンライン/オフライン状態を追跡するために、DynamoDB テーブルを使用します
+     - SQS キューからメッセージを読み取り、各ユーザーに通知を送信します
 
 5. **監視（`observability-stack.ts`）**  
-   - CloudWatchを通じて、アプリケーションの動作を監視します。
+   - CloudWatchを通じて、アプリケーションの動作を監視します
 */
 const app = new cdk.App();
 
