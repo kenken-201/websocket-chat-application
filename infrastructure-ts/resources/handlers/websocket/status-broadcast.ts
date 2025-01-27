@@ -36,6 +36,17 @@ const broadcaster = new WebsocketBroadcaster(AWS, metrics, ddb, logger, CONNECTI
  *   DynamoDB テーブルに保存された接続情報をもとに、特定の WebSocket 接続に対してイベントを配信
  * 
  * 
+ * serverless-chat.ts との関係性
+ * serverless-chat.ts は、この Lambda 関数を含む WebSocket スタック全体を
+ * 定義するプロジェクトのエントリポイントです
+ * 1. Lambda 関数のデプロイ設定:
+ *   status-broadcast Lambda は WebsocketStack 内で定義され、SQS イベントをトリガーとして設定
+ *   DynamoDB テーブルや WebSocket API のエンドポイントも、このスタックでプロビジョニング
+ * 2. 全体の流れへの影響:
+ *   WebSocket API を通じてリアルタイムでステータス通知を行う処理の一部
+ *   他の Lambda 関数（例: onmessage.ts, ondisconnect.ts）と協調して動作
+ * 
+ * 
  * プロジェクト全体の流れ
  * 1. クライアント接続:
  *   WebSocket 接続時に onconnect.ts がトリガーされ、接続情報を DynamoDB に保存
