@@ -1,12 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { Tracer } from '@aws-lambda-powertools/tracer';
-import { Logger } from '@aws-lambda-powertools/logger';
 import { LambdaInterface } from '@aws-lambda-powertools/commons';
-import { User } from '../../models/user';
+import { Logger } from '@aws-lambda-powertools/logger';
+import { Tracer } from '@aws-lambda-powertools/tracer';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { Status } from '../../models/status';
+import { User } from '../../models/user';
 
 const { CONNECTIONS_TABLE_NAME, LOG_LEVEL, COGNITO_USER_POOL_ID } = process.env;
 const logger = new Logger({ serviceName: 'websocketMessagingService', logLevel: LOG_LEVEL });
