@@ -34,6 +34,15 @@ const broadcaster = new WebsocketBroadcaster(AWS, metrics, ddb, logger, CONNECTI
  *   イベント（ユーザーのオンライン/オフラインの変更）を処理するトリガーとして機能
  * 2. WebSocket クライアントへのステータス通知:
  *   DynamoDB テーブルに保存された接続情報をもとに、特定の WebSocket 接続に対してイベントを配信
+ * 
+ * 
+ * プロジェクト全体の流れ
+ * 1. クライアント接続:
+ *   WebSocket 接続時に onconnect.ts がトリガーされ、接続情報を DynamoDB に保存
+ * 2. イベントの発生:
+ *   ユーザーがステータスを変更すると、その情報が SQS キューに送信
+ * 3. ステータスブロードキャスト:
+ *   status-broadcast.ts が SQS メッセージを処理し、WebSocket クライアントに通知
  */
 class Lambda implements LambdaInterface {
     /**
