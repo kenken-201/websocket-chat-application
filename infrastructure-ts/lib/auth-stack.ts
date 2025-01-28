@@ -1,13 +1,23 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { Duration, Stack, StackProps } from 'aws-cdk-lib'
+import { Duration, Stack, StackProps } from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import { Construct } from 'constructs';
 import { Code, Function, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NagSuppressions } from 'cdk-nag';
+import { Construct } from 'constructs';
 
 
+/*
+* ユーザー認証基盤の構築
+*   Amazon Cognitoを使用して、ユーザー認証（サインイン・サインアップ）を行うためのユーザープールを作成します。
+*   フロントエンドやAPIが認証済みのユーザーのみアクセスできるようにします。
+* アプリケーションクライアントの設定
+*   フロントエンドやモバイルアプリから認証リクエストを行うためのクライアント（User Pool Client）を設定します。
+* カスタムドメインやトリガーの設定（オプション）
+*   Cognitoのホストされたログインページを使用する場合は、カスタムドメインを設定します。
+*   ユーザー登録後に追加処理が必要な場合は、Lambdaトリガーを定義することもあります。
+*/
 export class AuthenticationStack extends Stack {
 
   readonly serverlessChatUserPool: cognito.UserPool;
@@ -32,9 +42,10 @@ export class AuthenticationStack extends Stack {
         };`)
     });
 
+    // ユーザープールの作成
     this.serverlessChatUserPool = new cognito.UserPool(this, 'ServerlessChatUserPool', {
       selfSignUpEnabled: true,
-      autoVerify: { email: true, phone: true },
+      autoVerify: { email: true, phone: true }, // メールアドレス,電話番号の自動検証
       passwordPolicy: {
         minLength: 12,
         requireLowercase: true,

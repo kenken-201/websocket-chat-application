@@ -1,14 +1,23 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { Tracer } from '@aws-lambda-powertools/tracer';
-import { Logger } from '@aws-lambda-powertools/logger';
+// APIGatewayProxyEvent: API Gatewayからのリクエストイベント（接続情報を含む）
+// APIGatewayProxyResult: API Gatewayへのレスポンス（ステータスコードとメッセージ）
+// Powertoolsライブラリ: ロギング（Logger）、トレーシング（Tracer）、メトリクス（Metrics）を統合して効率的な監視を実現
+// StatusChangeEvent, Status: ステータス変更イベントと状態（オンライン/オフライン）を定義するデータモデル
 import { LambdaInterface } from '@aws-lambda-powertools/commons';
+import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics, MetricUnits } from '@aws-lambda-powertools/metrics';
-import { StatusChangeEvent } from '../../models/status-change-event';
+import { Tracer } from '@aws-lambda-powertools/tracer';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { Status } from '../../models/status';
+import { StatusChangeEvent } from '../../models/status-change-event';
 
+// 環境変数とサービスの初期化
+// CONNECTIONS_TABLE_NAME: 接続情報を保存するDynamoDBテーブル名
+// STATUS_QUEUE_URL: ステータス変更イベントを送信するSQSキューのURL
+// ddb: DynamoDBクライアント: 接続情報のクエリと削除に利用
+// SQS: SQSクライアント: ステータス変更イベントを送信に利用
 const { CONNECTIONS_TABLE_NAME, LOG_LEVEL, STATUS_QUEUE_URL } = process.env;
 const logger = new Logger({ serviceName: 'websocketMessagingService', logLevel: LOG_LEVEL });
 const tracer = new Tracer({ serviceName: 'websocketMessagingService' });
@@ -17,6 +26,18 @@ const AWS = tracer.captureAWS(require('aws-sdk'));
 const ddb = tracer.captureAWSClient(new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10', region: process.env.AWS_REGION }));
 const SQS = tracer.captureAWSClient(new AWS.SQS());
 
+/**
+ * ondisconnect.tsは、クライアントがWebSocket接続を切断した際にトリガーされるLambda関数を定義しています
+ * このファイルは、DynamoDBから接続情報を削除し、ユーザーのステータス変更（オフライン）を他のシステムに通知する役割を担っています
+ * 
+ * ファイル全体の役割
+ * 1. 接続情報の削除:
+ *   クライアントのconnectionIdをキーにしてDynamoDBテーブル（CONNECTIONS_TABLE_NAME）から接続情報を削除します
+ * 2. ステータス変更通知:
+ *   接続終了後にユーザーのステータス（オフライン）をSQS経由で通知します
+ * 3. 監視とメトリクス:
+ *   AWS Lambda Powertoolsを利用してロギング、トレーシング、メトリクス収集を行い、監視性を向上させます
+ */
 class Lambda implements LambdaInterface {
 
     @tracer.captureLambdaHandler()

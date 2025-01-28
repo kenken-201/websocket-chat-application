@@ -1,17 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { Stack, StackProps } from 'aws-cdk-lib'
-import { Runtime } from 'aws-cdk-lib/aws-lambda';
-import { Table } from 'aws-cdk-lib/aws-dynamodb';
+import { Stack, StackProps } from 'aws-cdk-lib';
 import { AuthorizationType, CognitoUserPoolsAuthorizer, IResource, LambdaIntegration, MockIntegration, PassthroughBehavior, RestApi } from 'aws-cdk-lib/aws-apigateway';
-import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { WebSocketApi } from 'aws-cdk-lib/aws-apigatewayv2';
-import { Construct } from 'constructs';
-import { join } from 'path';
-import * as path from 'path';
 import { UserPool } from 'aws-cdk-lib/aws-cognito';
+import { Table } from 'aws-cdk-lib/aws-dynamodb';
+import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { Runtime } from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { Construct } from 'constructs';
+import * as path from 'path';
+import { join } from 'path';
 
 export interface RestApiProps extends StackProps {
   messagesTable: Table;
@@ -22,6 +22,36 @@ export interface RestApiProps extends StackProps {
   logLevel: string;
 }
 
+/**
+ * infrastructure-ts/lib/rest-api-stack.tsは、REST APIを定義・構築するためのAWS CDKスタックです
+ * このスタックは以下の主要な役割を持っています：
+ * 1. API Gatewayの設定
+ *   Amazon API Gatewayを利用してREST APIエンドポイントを作成します
+ *   RestApiクラスを用いて設定が行われ、エンドポイントやリソース階層を定義しています
+ *   APIスキーマとして、以下のリソース・メソッドを提供します：
+ *     bash
+ *     Copy
+ *     Edit
+ *     [GET]    /config
+ *     [GET]    /users
+ *     [GET]    /channels
+ *     [POST]   /channels/
+ *     [GET]    /channels/{ID}
+ *     [GET]    /channels/{ID}/messages
+ *   各エンドポイントに対応するLambda関数を用いて、リクエストを処理します
+ * 2. Lambda関数の作成と統合
+ *   ハンドラファイル（resources/handlers/rest/ディレクトリ内）を使用して、
+ *   リクエストを処理するLambda関数を作成しています
+ *   Lambda関数とDynamoDBテーブル（messagesTable、channelsTable、connectionsTable）や
+ *   CognitoなどのAWSリソースを統合し、権限を設定しています
+ * 3. 認証の実装
+ *   Amazon Cognitoを使用してユーザー認証を行っています
+ *   /usersや/channelsなど、ユーザー関連のエンドポイントでは、
+ *   Cognito User Pools Authorizerを用いて認証を適用しています
+ * 4. CORS設定の追加
+ *   クライアントアプリケーションからのリクエストを許可するため、
+ *   各リソースにCORS（Cross-Origin Resource Sharing）オプションを設定しています
+ */
 export class RestApiStack extends Stack {
 
   public apiGatewayEndpoint: string;
@@ -41,8 +71,13 @@ export class RestApiStack extends Stack {
     [GET]    /channels/{ID}/messages
     ==================================== */
 
+    // Lambda関数の作成
+    //   各エンドポイントに対応するLambda関数を作成しています
+    //   共通のプロパティ（例：環境変数やNode.jsランタイム設定）はsharedLambdaPropsで管理し、
+    //   特定のハンドラファイルをエントリーポイントとして指定しています
     const sharedLambdaProps: NodejsFunctionProps = {
       bundling: {
+        // 外部モジュールの設定
         externalModules: [
         ],
         nodeModules: [
@@ -145,6 +180,8 @@ export class RestApiStack extends Stack {
     });
     const authMethodOptions = { authorizer: auth, authorizationType: AuthorizationType.COGNITO };
 
+    // API Gatewayのリソース（例：/users、/channels）を定義し、
+    // それぞれのリソースにLambda関数を統合しています
     const api = this.restApi.root.addResource('api');
 
     const config = api.addResource('config');
